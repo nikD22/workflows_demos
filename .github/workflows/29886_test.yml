@@ -1,0 +1,93 @@
+name: Test
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  check-tests:
+    name: Check test files exist
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check for test files
+        run: |
+          if find . -name "test_*.py" -o -name "*_test.py" | grep -q .; then
+            echo "Test files found:"
+            find . -name "test_*.py" -o -name "*_test.py"
+          else
+            echo "ERROR: No test files found in repository." > napaka.txt
+            echo "::error::No test files found."
+          fi
+
+      - name: Upload napaka.txt artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: napaka-check
+          path: napaka.txt
+          if-no-files-found: ignore
+
+
+
+  run-tests:
+    name: Run tests (Python ${{ matrix.python-version }})
+    runs-on: self-hosted
+    needs: check-tests
+
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download napaka.txt artifact from Job 1
+        uses: actions/download-artifact@v4
+        with:
+          name: napaka
+          path: .
+        # If artifact doesn't exist this step skips
+        continue-on-error: true
+
+      - name: Check if Job 1 reported an error
+        run: |
+          if [ -f napaka.txt ] && [ -s napaka.txt ]; then
+            echo "Job 1 reported an error:"
+            cat napaka.txt
+            exit 1
+          else
+            echo "No errors from Job 1, proceeding..."
+          fi
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          fi
+          pip install pytest
+
+      - name: Run pytest and capture errors
+        run: |
+          # Run pytest; if it fails, write error output to napaka.txt
+          if ! pytest --tb=short 2>&1; then
+            pytest --tb=short 2>&1 | tee napaka.txt
+            exit 1
+          fi
+
+      - name: Upload napaka.txt on test failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: napaka-${{ matrix.python-version }}
+          path: napaka.txt
+          if-no-files-found: ignore
