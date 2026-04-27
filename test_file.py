@@ -5,7 +5,8 @@ def test_add():
   assert main.add(-1, 1) == 0
   assert main.add(0, 0) == 0
   #assert main.add(0,0) ==1
-  main.nonExistantFunc()
+  #main.nonExistantFunc()
+  
 
 def test_subtract():
   assert main.subtract(5, 3) == 2
