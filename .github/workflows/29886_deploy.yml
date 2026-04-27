@@ -1,0 +1,50 @@
+name: Deploy
+env: #variables to use latter
+  DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+  DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+  REPONAME: ${{ secrets.REPO_NAME }}
+
+on:
+  workflow_run:
+    workflows: ["Test"]
+    types:
+      - completed #runs after the workflow Test is completed, but will continue even if the workflow fails, as long as it finishes
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    if: ${{ github.event.workflow_run.conclusion == 'success' }} #checks if the previous tests succeded
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download napaka.txt artifact from Test workflow #not really needed cuz the eralier check
+        uses: actions/download-artifact@v4
+        with:
+          name: napaka-check
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+
+      - name: Check napaka.txt is empty or missing
+        run: |
+          if [ -f napaka.txt ] && [ -s napaka.txt ]; then
+            echo "Errors found in napaka.txt, aborting deploy:"
+            cat napaka.txt
+            exit 1
+          else
+            echo "No errors found, proceeding with deploy..."
+          fi
+
+      - name: Log in to Docker
+        run: |
+          docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
+
+      - name: Build Docker image
+        run: |
+          docker build . --file Dockerfile --tag $DOCKER_USERNAME/$REPONAME:latest
+
+      - name: Push Docker image
+        run: |
+          docker push $DOCKER_USERNAME/$REPONAME:latest
