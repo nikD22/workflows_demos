@@ -11,7 +11,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4 #coies the repository to the runner
 
       - name: Check for test files
         run: |
@@ -26,14 +26,14 @@ jobs:
       - name: Upload napaka.txt artifact
         uses: actions/upload-artifact@v4
         with:
-          name: napaka-check
+          name: napaka-check #can be searched by this name
           path: napaka.txt
           if-no-files-found: ignore
 
 
 
   run-tests:
-    name: Run tests (Python ${{ matrix.python-version }})
+    name: Run tests (Python ${{ matrix.python-version }}) #branches off here
     runs-on: self-hosted
     needs: check-tests
 
